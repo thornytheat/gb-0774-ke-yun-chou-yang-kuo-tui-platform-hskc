@@ -7,7 +7,7 @@ NAMES = {'returns','frame'}
 def sources(body):
     if isinstance(body,dict) and set(body)=={'sample'}:
         sample = body['sample']
-        if sample not in ('dirty','clean'):
+        if sample not in ('dirty','clean','late'):
             raise SurveyProblem('NO_SAMPLE','找不到样例',404)
         return {name:(EXAMPLES/sample/f'{name}.csv').read_bytes().decode() for name in sorted(NAMES)}
     if isinstance(body,dict) and set(body)=={'tables'}:

@@ -9,8 +9,9 @@
 | M3 非响应权重校准 | 核对基础权和校准因子 | `/api/survey/weights` | `app/modules/weights/calibration.py` | `tests/test_weights.py` |
 | M4 扩推整数分配 | 查层内整数尾差 | `/api/survey/allocation` | `app/modules/allocation/remainders.py` | `tests/test_allocation.py` |
 | M5 层级偏差对账 | 核算人口、回收行和百分点 | `/api/survey/balance` | `app/modules/balance/service.py` `app/modules/balance/shares.py` | `tests/test_balance.py` |
-| M6 批次留档复跑 | 事务留档及同源复算 | `/api/runs` | `app/modules/ledger/storage.py` `app/modules/ledger/service.py` | `tests/test_archive.py` |
-| M7 样本证据签发 | 按原件和结果摘要签发 | `/api/export/<id>` | `app/modules/release/audit.py` `app/modules/release/service.py` | `tests/test_release.py` |
+| M6 公开范围裁定 | 裁定单答卷层抑制与全市公开口径 | `/api/survey/disclosure` | `app/modules/disclosure/service.py` | `tests/test_disclosure.py` |
+| M7 批次留档复跑 | 事务留档及同源复算 | `/api/runs` | `app/modules/ledger/storage.py` `app/modules/ledger/service.py` | `tests/test_archive.py` |
+| M8 样本证据签发 | 公开包签发、原件隔离与不重复签发 | `/api/export/<id>` | `app/modules/release/audit.py` `app/modules/release/service.py` | `tests/test_release.py` |
 
 ## 陷阱登记
 
@@ -25,5 +26,8 @@
 | TRAP-14 | 同版问项冲突 | 后写覆盖 | 全部冲突票隔离 | `app/modules/returns/visits.py` | `tests/test_returns.py::test_conflict` |
 | TRAP-19 | 新旧重访与重复同时出现 | 顺序覆盖 | 先版本再副本 | `app/modules/returns/visits.py` | `tests/test_returns.py::test_latest_then_duplicates` |
 | TRAP-24 | 城北三类各 100/3 人 | 四舍五入只剩 99 人 | 最大余数，直达先补 | `app/modules/allocation/remainders.py` | `tests/test_allocation.py::test_tie_is_stable` |
+| TRAP-31 | 单答卷层选项人数 | 全市数减其余分层反推该份答案 | 仅抑制单答卷层明细，保留层名与出票人口作线路参考；全市原数照发 | `app/modules/disclosure/service.py` | `tests/test_disclosure.py::test_suppression_blocks_subtraction_but_keeps_city_total` |
 
 脏样例出票 290 = 250 扩推 + 40 不可推断。原始答卷 18 = 6 回收隔离 + 4 问项隔离 + 2 未回应 + 6 有效。枢纽 150 人按基础权 4、3、2 校准为 200/3、50、100/3。城北按三份等权回收分得 34、33、33。旧分层及隔离证据都可由签发包还原。
+
+公开裁定（规则版本 `disclosure-2026.1`）在对账后执行：层内 `usable == 1` 即抑制，其余层（含零响应层）公开。`late` 样例中末班为单答卷层，选项明细被抑制；晚到回访补入第二份有效答卷后该层转为公开，按新原件重算为新批次，旧批次公开包与印章仍可核验。签发包只含 `manifest`、`disclosure`、`excluded` 计数与 `seal`，原始答卷留在内部归档；`issuances` 表以批次 id 为主键，重跑或重复领取都不重复签发。

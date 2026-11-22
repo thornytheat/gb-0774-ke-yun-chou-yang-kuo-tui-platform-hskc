@@ -1,6 +1,7 @@
 import json
 import sqlite3
 from contextlib import contextmanager, closing
+from datetime import UTC, datetime
 from pathlib import Path
 
 from app.errors import SurveyProblem
@@ -17,6 +18,9 @@ class Archive:
                 id TEXT PRIMARY KEY, created TEXT NOT NULL, document TEXT NOT NULL, results TEXT NOT NULL
             ); CREATE TABLE IF NOT EXISTS originals(
                 id TEXT REFERENCES runs(id), name TEXT NOT NULL, csv TEXT NOT NULL, PRIMARY KEY(id,name)
+            ); CREATE TABLE IF NOT EXISTS issuances(
+                id TEXT PRIMARY KEY REFERENCES runs(id), seal TEXT NOT NULL,
+                disclosure_rule TEXT NOT NULL, spec TEXT NOT NULL, issued TEXT NOT NULL
             );''')
 
     @contextmanager
@@ -47,3 +51,20 @@ class Archive:
         with self.connect() as db:
             rows = db.execute('SELECT document FROM runs ORDER BY created DESC,id LIMIT 40').fetchall()
         return [json.loads(row[0]) for row in rows]
+
+    def register_issuance(self, key, seal, disclosure_rule, spec):
+        with self.connect() as db:
+            db.execute(
+                'INSERT OR IGNORE INTO issuances VALUES (?,?,?,?,?)',
+                (key, seal, disclosure_rule, spec,
+                 datetime.now(UTC).isoformat(timespec='seconds')),
+            )
+            row = db.execute('SELECT seal,issued FROM issuances WHERE id=?', (key,)).fetchone()
+        if not row:
+            raise SurveyProblem('NO_RUN', '找不到扩推归档', 404)
+        return dict(id=key, seal=row[0], issued=row[1], reused=row[0] == seal)
+
+    def issuance(self, key):
+        with self.connect() as db:
+            row = db.execute('SELECT seal,issued FROM issuances WHERE id=?', (key,)).fetchone()
+        return None if not row else dict(id=key, seal=row[0], issued=row[1])

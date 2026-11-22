@@ -2,7 +2,7 @@ from flask import Blueprint,current_app,jsonify,request
 
 from app.errors import SurveyProblem
 from app.modules.ledger.service import archive
-from app.modules.release.service import release
+from app.modules.release.service import issue
 from app.pipeline import STAGES,run
 from app.source import sources
 
@@ -39,7 +39,9 @@ def new_run():
 @survey.get('/runs/<key>')
 def get_run(key):
     manifest,_,results=storage().read(key)
-    return jsonify(id=key,manifest=manifest,balance=results['balance'],allocation=results['allocation'])
+    return jsonify(id=key,manifest=manifest,balance=results['balance'],
+                   allocation=results['allocation'],disclosure=results['disclosure'],
+                   issuance=storage().issuance(key))
 
 
 @survey.post('/runs/<key>/rerun')
@@ -50,6 +52,7 @@ def rerun(key):
 
 @survey.get('/export/<key>')
 def export(key):
-    response=jsonify(release(*storage().read(key)))
-    response.headers['Content-Disposition']=f'attachment; filename="survey-{key[:12]}.json"'
+    package, record = issue(storage(), *storage().read(key))
+    response=jsonify(dict(**package, issuance=record))
+    response.headers['Content-Disposition']=f'attachment; filename="survey-public-{key[:12]}.json"'
     return response
